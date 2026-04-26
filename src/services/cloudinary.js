@@ -1,3 +1,6 @@
+import { createUserError } from '../lib/errors'
+import { validatePdfFile } from '../lib/validation'
+
 const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
 const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
 
@@ -32,8 +35,10 @@ export function extractPublicIdFromUrl(url) {
 
 export async function uploadPdfToCloudinary(file) {
   if (!cloudName || !uploadPreset) {
-    throw new Error('Cloudinary environment variables are missing.')
+    throw createUserError('Upload failed. Please try again.')
   }
+
+  validatePdfFile(file)
 
   const formData = new FormData()
   formData.append('file', file)
@@ -49,7 +54,7 @@ export async function uploadPdfToCloudinary(file) {
   const data = await response.json()
 
   if (!response.ok || !data.secure_url) {
-    throw new Error(data.error?.message || 'Cloudinary upload failed.')
+    throw createUserError('Upload failed. Please try again.')
   }
 
   return data

@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { getErrorMessage } from '../lib/errors'
+import { validatePdfFile } from '../lib/validation'
 import { createBook } from '../services/books'
 import { buildCloudinaryAsset, uploadPdfToCloudinary } from '../services/cloudinary'
 import { ensureCategoriesSeeded } from '../services/categories'
 import { createQuote } from '../services/quotes'
+
+const UPLOAD_COOLDOWN_MS = 30_000
 
 function createEmptyBookForm(defaultCategory) {
   return {
@@ -22,8 +26,10 @@ function UploadPage() {
   const [quoteForm, setQuoteForm] = useState({ text: '', writer: '' })
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [uploadBlocked, setUploadBlocked] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const uploadCooldownRef = useRef(null)
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 767px)')
@@ -36,6 +42,15 @@ function UploadPage() {
       mediaQuery.removeEventListener('change', updateDeviceState)
     }
   }, [])
+
+  useEffect(
+    () => () => {
+      if (uploadCooldownRef.current) {
+        window.clearTimeout(uploadCooldownRef.current)
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
     let active = true
@@ -50,7 +65,7 @@ function UploadPage() {
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError.message || 'Unable to load categories.')
+          setError(getErrorMessage(loadError, 'Something went wrong'))
         }
       }
     }
@@ -68,6 +83,26 @@ function UploadPage() {
     )
   }
 
+  function enforceUploadCooldown() {
+    if (uploadBlocked) {
+      setError('Please wait before uploading again.')
+      throw new Error('cooldown')
+    }
+  }
+
+  function startUploadCooldown() {
+    setUploadBlocked(true)
+
+    if (uploadCooldownRef.current) {
+      window.clearTimeout(uploadCooldownRef.current)
+    }
+
+    uploadCooldownRef.current = window.setTimeout(() => {
+      setUploadBlocked(false)
+      uploadCooldownRef.current = null
+    }, UPLOAD_COOLDOWN_MS)
+  }
+
   function addBookForm() {
     setBookForms((current) => [
       ...current,
@@ -83,19 +118,19 @@ function UploadPage() {
 
   async function handleBookSubmit(event) {
     event.preventDefault()
-    const incompleteForm = bookForms.find((form) => !form.title || !form.imageUrl || !form.pdfFile)
-
-    if (incompleteForm) {
-      setError('Each book needs title, image URL, and PDF.')
-      return
-    }
 
     try {
+      enforceUploadCooldown()
       setSubmitting(true)
       setError('')
       setSuccess('')
 
       for (const form of bookForms) {
+        if (!form.title.trim() || !form.imageUrl.trim() || !form.category.trim()) {
+          throw new Error('Each book needs title, image URL, category, and PDF.')
+        }
+
+        validatePdfFile(form.pdfFile)
         const uploadedAsset = await uploadPdfToCloudinary(form.pdfFile)
         const asset = buildCloudinaryAsset(uploadedAsset.secure_url, uploadedAsset)
 
@@ -109,9 +144,14 @@ function UploadPage() {
       }
 
       setBookForms([createEmptyBookForm(categories[0]?.name || '')])
+      startUploadCooldown()
       setSuccess(`${bookForms.length} ${bookForms.length === 1 ? 'book' : 'books'} uploaded.`)
     } catch (submitError) {
-      setError(submitError.message || 'Unable to upload books.')
+      if (submitError.message === 'cooldown') {
+        return
+      }
+
+      setError(getErrorMessage(submitError, 'Upload failed, try again'))
     } finally {
       setSubmitting(false)
     }
@@ -120,20 +160,21 @@ function UploadPage() {
   async function handleQuoteSubmit(event) {
     event.preventDefault()
 
-    if (!quoteForm.text.trim() || !quoteForm.writer.trim()) {
-      setError('Quote and writer are required.')
-      return
-    }
-
     try {
+      enforceUploadCooldown()
       setSubmitting(true)
       setError('')
       setSuccess('')
       await createQuote(quoteForm)
       setQuoteForm({ text: '', writer: '' })
+      startUploadCooldown()
       setSuccess('Quote uploaded.')
     } catch (submitError) {
-      setError(submitError.message || 'Unable to upload quote.')
+      if (submitError.message === 'cooldown') {
+        return
+      }
+
+      setError(getErrorMessage(submitError, 'Upload failed, try again'))
     } finally {
       setSubmitting(false)
     }
@@ -250,9 +291,21 @@ function UploadPage() {
                       className="file-input"
                       type="file"
                       accept="application/pdf"
-                      onChange={(event) =>
-                        updateBookForm(form.id, 'pdfFile', event.target.files?.[0] || null)
-                      }
+                      onChange={(event) => {
+                        const nextFile = event.target.files?.[0] || null
+
+                        try {
+                          if (nextFile) {
+                            validatePdfFile(nextFile)
+                          }
+                          setError('')
+                          updateBookForm(form.id, 'pdfFile', nextFile)
+                        } catch (fileError) {
+                          event.target.value = ''
+                          updateBookForm(form.id, 'pdfFile', null)
+                          setError(getErrorMessage(fileError, 'Invalid file type'))
+                        }
+                      }}
                       required
                     />
                   </div>

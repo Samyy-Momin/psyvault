@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { getErrorMessage } from '../lib/errors'
 
 function LoginPage() {
   const { user, login, authReady } = useAuth()
@@ -25,7 +26,7 @@ function LoginPage() {
       await login(form.email, form.password)
       navigate(redirectTo, { replace: true })
     } catch (loginError) {
-      setError(loginError.message || 'Unable to sign in.')
+      setError(getErrorMessage(loginError, 'Something went wrong'))
     } finally {
       setSubmitting(false)
     }

@@ -451,6 +451,65 @@ img {
   padding: 1rem 0.8rem;
 }
 
+.quote-share-card {
+  display: grid;
+  gap: 0.9rem;
+  width: min(100%, 32rem);
+  padding: 2rem 1.6rem;
+  border: 1px solid var(--border);
+}
+
+.quote-share-card.is-black {
+  background: #050505;
+  color: #ffffff;
+}
+
+.quote-share-card.is-white {
+  background: #ffffff;
+  color: #111111;
+  border-color: rgba(17, 17, 17, 0.14);
+}
+
+.quote-share-text,
+.quote-share-author,
+.quote-share-credit,
+.quote-share-book,
+.quote-share-branding {
+  margin: 0;
+  text-align: center;
+}
+
+.quote-share-text {
+  font-size: 1.35rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.quote-share-author {
+  font-size: 0.88rem;
+  opacity: 0.84;
+}
+
+.quote-share-credit {
+  margin-top: -0.25rem;
+  font-size: 0.74rem;
+  opacity: 0.68;
+}
+
+.quote-share-book {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.72;
+}
+
+.quote-share-branding {
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  opacity: 0.48;
+}
+
 .empty-state {
   padding: 0.75rem;
 }
@@ -733,6 +792,14 @@ img {
   height: auto !important;
 }
 
+.pdf-page .react-pdf__Page__textContent {
+  user-select: text;
+}
+
+.pdf-page .react-pdf__Page__textContent ::selection {
+  background: rgba(255, 255, 255, 0.28);
+}
+
 .pdf-page-fallback {
   width: min(100%, 42rem);
   min-height: 3rem;
@@ -742,6 +809,157 @@ img {
   font-size: 0.78rem;
   border: 1px solid var(--border);
   background: #050505;
+}
+
+.quote-selection-action {
+  position: fixed;
+  z-index: 30;
+  transform: translate(-50%, -100%);
+  min-height: 2.2rem;
+  padding: 0.45rem 0.75rem;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.76);
+}
+
+.modal-panel {
+  width: min(100%, 48rem);
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 1rem;
+  background: #050505;
+  border: 1px solid var(--border);
+}
+
+.modal-header,
+.modal-actions,
+.quote-output-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.modal-subtitle {
+  margin: 0.3rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.quote-modal-grid {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 0.9rem;
+}
+
+.quote-modal-stage {
+  position: relative;
+  min-height: 18rem;
+}
+
+.quote-stage-panel {
+  animation: quoteFadeIn 240ms ease;
+}
+
+.quote-modal-meta {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.quote-modal-value {
+  min-height: 2.6rem;
+  display: flex;
+  align-items: center;
+  padding: 0.7rem;
+}
+
+.quote-style-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.quote-style-fieldset legend {
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.quote-style-options {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.quote-style-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.quote-preview-wrap {
+  margin-top: 0.9rem;
+  display: flex;
+  justify-content: center;
+}
+
+.quote-output {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  justify-items: center;
+}
+
+.quote-output-image {
+  width: 100%;
+  max-width: 26rem;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+}
+
+.quote-capture-surface {
+  position: fixed;
+  top: -10000px;
+  left: -10000px;
+  opacity: 1;
+  pointer-events: none;
+}
+
+.quote-output-actions {
+  width: 100%;
+  justify-content: center;
+}
+
+.quote-output-actions .button {
+  min-width: 10rem;
+}
+
+@keyframes quoteFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (min-width: 640px) {
@@ -758,6 +976,25 @@ img {
   .upload-book-grid,
   .admin-edit-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quote-modal-grid {
+    grid-template-columns: minmax(0, 1.25fr) minmax(16rem, 0.75fr);
+    align-items: start;
+  }
+}
+
+@media (max-width: 639px) {
+  .quote-output-actions,
+  .modal-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .quote-output-actions .button,
+  .modal-actions .button {
+    width: 100%;
   }
 }
 

@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import BookCard from '../components/BookCard'
 import HomeHeader from '../components/HomeHeader'
 import StickyQuotes from '../components/StickyQuotes'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { ALL_CATEGORIES } from '../lib/constants'
+import { getErrorMessage } from '../lib/errors'
 import { highlightMatchedText, runBookSearch } from '../lib/search'
 import { getBooksPage } from '../services/books'
 import { getCategories } from '../services/categories'
@@ -11,16 +12,16 @@ import { getQuotePreviews } from '../services/quotes'
 
 function HomePage() {
   const [books, setBooks] = useState([])
-  const [filteredBooks, setFilteredBooks] = useState([])
   const [quotes, setQuotes] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORIES)
   const [lastDoc, setLastDoc] = useState(null)
   const [hasMore, setHasMore] = useState(true)
-  const requestKeyRef = useRef('')
+  const requestKeyRef = useRef(false)
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300)
 
   useEffect(() => {
@@ -38,9 +39,8 @@ function HomePage() {
           setCategories(nextCategories)
         }
       } catch (loadError) {
-        console.error('Firestore fetch error:', loadError)
         if (active) {
-          setError(loadError.message || 'Unable to load PsyVault right now.')
+          setError(getErrorMessage(loadError, 'Something went wrong'))
         }
       }
     }
@@ -62,7 +62,6 @@ function HomePage() {
 
       requestKeyRef.current = requestKey
       setBooks([])
-      setFilteredBooks([])
       setLastDoc(null)
       setHasMore(true)
       setLoading(true)
@@ -73,35 +72,33 @@ function HomePage() {
           cursor: null,
         })
 
-        console.log('Books fetched:', page.books)
         setBooks(page.books)
-        setFilteredBooks(page.books)
         setLastDoc(page.lastDoc)
         setHasMore(page.hasMore)
       } catch (err) {
-        console.error('Firestore fetch error:', err)
         setBooks([])
-        setFilteredBooks([])
-        setError(err.message || 'Failed to load books')
+        setError(getErrorMessage(err, 'Failed to load books'))
       } finally {
-        requestKeyRef.current = ''
+        requestKeyRef.current = false
         setLoading(false)
       }
     }
 
     loadFirstPage()
-  }, [selectedCategory])
+  }, [])
 
-  useEffect(() => {
+  const filteredBooks = useMemo(() => {
     const normalizedSearchQuery = debouncedSearchQuery.trim().toLowerCase()
+    const categoryBooks =
+      selectedCategory === ALL_CATEGORIES
+        ? books
+        : books.filter((book) => book.category === selectedCategory)
 
     if (!normalizedSearchQuery) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFilteredBooks(books)
-      return
+      return categoryBooks
     }
 
-    const results = runBookSearch(books, normalizedSearchQuery).map((result) => {
+    return runBookSearch(categoryBooks, normalizedSearchQuery).map((result) => {
       const titleMatch = result.matches?.find((match) => match.key === 'title')
       const authorMatch = result.matches?.find((match) => match.key === 'author')
 
@@ -114,16 +111,14 @@ function HomePage() {
         ),
       }
     })
+  }, [books, debouncedSearchQuery, selectedCategory])
 
-    setFilteredBooks(results)
-  }, [debouncedSearchQuery, books])
-
-  async function handleLoadMore() {
-    if (loading || !hasMore || !lastDoc) {
+  const handleLoadMore = useCallback(async () => {
+    if (loading || loadingMore || !hasMore || !lastDoc) {
       return
     }
 
-    setLoading(true)
+    setLoadingMore(true)
     setError('')
 
     try {
@@ -135,12 +130,11 @@ function HomePage() {
       setLastDoc(page.lastDoc)
       setHasMore(page.hasMore)
     } catch (err) {
-      console.error('Firestore fetch error:', err)
-      setError(err.message || 'Failed to load books')
+      setError(getErrorMessage(err, 'Failed to load books'))
     } finally {
-      setLoading(false)
+      setLoadingMore(false)
     }
-  }
+  }, [hasMore, lastDoc, loading, loadingMore])
 
   const normalizedSearchQuery = debouncedSearchQuery.trim().toLowerCase()
 
@@ -176,10 +170,10 @@ function HomePage() {
                 <button
                   type="button"
                   className="button load-more-button"
-                  disabled={loading}
+                  disabled={loadingMore}
                   onClick={handleLoadMore}
                 >
-                  {loading ? 'Loading…' : 'Load more'}
+                  {loadingMore ? 'Loading…' : 'Load more'}
                 </button>
               ) : null}
             </>

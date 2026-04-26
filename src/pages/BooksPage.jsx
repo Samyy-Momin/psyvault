@@ -1,5 +1,7 @@
 import { Edit3, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { getErrorMessage } from '../lib/errors'
+import { validatePdfFile } from '../lib/validation'
 import {
   createCategory,
   deleteCategory,
@@ -14,6 +16,8 @@ import {
   updateBook,
 } from '../services/books'
 import { uploadPdfToCloudinary } from '../services/cloudinary'
+
+const DELETE_COOLDOWN_MS = 3_000
 
 function BooksPage() {
   const [categories, setCategories] = useState([])
@@ -36,8 +40,10 @@ function BooksPage() {
   const [editForm, setEditForm] = useState(null)
 
   const [submitting, setSubmitting] = useState(false)
+  const [deleteBlocked, setDeleteBlocked] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const deleteCooldownRef = useRef(null)
 
   useEffect(() => {
     let active = true
@@ -64,7 +70,7 @@ function BooksPage() {
         setBooksHasMore(booksPage.hasMore)
       } catch (loadError) {
         if (active) {
-          setError(loadError.message || 'Unable to load admin data.')
+          setError(getErrorMessage(loadError, 'Something went wrong'))
         }
       } finally {
         if (active) {
@@ -81,6 +87,28 @@ function BooksPage() {
     }
   }, [])
 
+  useEffect(
+    () => () => {
+      if (deleteCooldownRef.current) {
+        window.clearTimeout(deleteCooldownRef.current)
+      }
+    },
+    [],
+  )
+
+  function startDeleteCooldown() {
+    setDeleteBlocked(true)
+
+    if (deleteCooldownRef.current) {
+      window.clearTimeout(deleteCooldownRef.current)
+    }
+
+    deleteCooldownRef.current = window.setTimeout(() => {
+      setDeleteBlocked(false)
+      deleteCooldownRef.current = null
+    }, DELETE_COOLDOWN_MS)
+  }
+
   async function loadCategoriesPage(pageIndex, cursor) {
     setCategoriesLoading(true)
     try {
@@ -90,7 +118,7 @@ function BooksPage() {
       setCategoriesHasMore(page.hasMore)
       setCategoryPageIndex(pageIndex)
     } catch (loadError) {
-      setError(loadError.message || 'Unable to load categories.')
+      setError(getErrorMessage(loadError, 'Failed to load categories'))
     } finally {
       setCategoriesLoading(false)
     }
@@ -105,7 +133,7 @@ function BooksPage() {
       setBooksHasMore(page.hasMore)
       setBookPageIndex(pageIndex)
     } catch (loadError) {
-      setError(loadError.message || 'Unable to load books.')
+      setError(getErrorMessage(loadError, 'Failed to load books'))
     } finally {
       setBooksLoading(false)
     }
@@ -132,10 +160,6 @@ function BooksPage() {
   async function handleCategoryCreate(event) {
     event.preventDefault()
 
-    if (!newCategory.trim()) {
-      return
-    }
-
     try {
       setSubmitting(true)
       await createCategory(newCategory)
@@ -145,17 +169,13 @@ function BooksPage() {
       setSuccess('Category added.')
       setError('')
     } catch (createError) {
-      setError(createError.message || 'Unable to add category.')
+      setError(getErrorMessage(createError, 'Unable to add category.'))
     } finally {
       setSubmitting(false)
     }
   }
 
   async function handleCategoryUpdate(id) {
-    if (!editingCategoryName.trim()) {
-      return
-    }
-
     try {
       setSubmitting(true)
       await updateCategory(id, editingCategoryName)
@@ -165,7 +185,7 @@ function BooksPage() {
       setSuccess('Category updated.')
       setError('')
     } catch (updateError) {
-      setError(updateError.message || 'Unable to update category.')
+      setError(getErrorMessage(updateError, 'Unable to update category.'))
     } finally {
       setSubmitting(false)
     }
@@ -178,14 +198,20 @@ function BooksPage() {
       return
     }
 
+    if (deleteBlocked) {
+      setError('Please wait before deleting again.')
+      return
+    }
+
     try {
       setSubmitting(true)
       await deleteCategory(category.id)
+      startDeleteCooldown()
       await loadCategoriesPage(categoryPageIndex, categoryCursorStack[categoryPageIndex] || null)
       setSuccess('Category deleted.')
       setError('')
     } catch (deleteError) {
-      setError(deleteError.message || 'Unable to delete category.')
+      setError(getErrorMessage(deleteError, 'Unable to delete category.'))
     } finally {
       setSubmitting(false)
     }
@@ -198,17 +224,23 @@ function BooksPage() {
       return
     }
 
+    if (deleteBlocked) {
+      setError('Please wait before deleting again.')
+      return
+    }
+
     try {
       setSubmitting(true)
       await deleteBookViaFunction({
         bookId: book.id,
         publicId: book.public_id || book.filePublicId,
       })
+      startDeleteCooldown()
       setBooks((current) => current.filter((item) => item.id !== book.id))
       setSuccess('Book deleted.')
       setError('')
     } catch (deleteError) {
-      setError(deleteError.message || 'Unable to delete book.')
+      setError(getErrorMessage(deleteError, 'Failed to delete book'))
     } finally {
       setSubmitting(false)
     }
@@ -230,7 +262,12 @@ function BooksPage() {
         imageUrl: editForm.imageUrl.trim(),
       }
 
+      if (!updatedBook.title || !updatedBook.category || !updatedBook.imageUrl) {
+        throw new Error('Upload failed. Please try again.')
+      }
+
       if (editForm.pdfFile) {
+        validatePdfFile(editForm.pdfFile)
         const uploadedAsset = await uploadPdfToCloudinary(editForm.pdfFile)
         const assetPatch = await replaceBookPdf(updatedBook, uploadedAsset)
         updatedBook = {
@@ -246,7 +283,7 @@ function BooksPage() {
       setSuccess('Book updated.')
       setError('')
     } catch (updateError) {
-      setError(updateError.message || 'Unable to update book.')
+      setError(getErrorMessage(updateError, 'Upload failed, try again'))
     } finally {
       setSubmitting(false)
     }

@@ -1,7 +1,6 @@
 import {
   addDoc,
   collection,
-  deleteDoc,
   doc,
   getDocs,
   query,
@@ -9,6 +8,7 @@ import {
   updateDoc,
   limit,
 } from 'firebase/firestore'
+import { createUserError } from '../lib/errors'
 import { db } from '../lib/firebase'
 
 const quotesCollection = collection(db, 'quotes')
@@ -36,22 +36,33 @@ export async function getQuotePreviews(limitCount = 3) {
 }
 
 export async function createQuote(input) {
+  const text = input.text?.trim()
+  const writer = input.writer?.trim()
+
+  if (!text || !writer) {
+    throw createUserError('Quote and writer are required.')
+  }
+
   await addDoc(quotesCollection, {
-    text: input.text.trim(),
-    writer: input.writer.trim(),
+    text,
+    writer,
+    bookTitle: input.bookTitle?.trim() || '',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
 }
 
 export async function updateQuote(id, input) {
+  const text = input.text?.trim()
+  const writer = input.writer?.trim()
+
+  if (!text || !writer) {
+    throw createUserError('Quote and writer are required.')
+  }
+
   await updateDoc(doc(db, 'quotes', id), {
-    text: input.text.trim(),
-    writer: input.writer.trim(),
+    text,
+    writer,
     updatedAt: serverTimestamp(),
   })
-}
-
-export async function deleteQuote(id) {
-  await deleteDoc(doc(db, 'quotes', id))
 }

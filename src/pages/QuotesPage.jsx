@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import QuoteCard from '../components/QuoteCard'
 import { getQuotes } from '../services/quotes'
 
 function QuotesPage() {
@@ -52,10 +53,13 @@ function QuotesPage() {
       {!loading && !error ? (
         <section className="quotes-list">
           {quotes.map((quote) => (
-            <article key={quote.id} className="quote-card">
-              <p className="quote-text">{quote.text}</p>
-              <p className="quote-writer">{quote.writer}</p>
-            </article>
+            <QuoteCard
+              key={quote.id}
+              quoteText={quote.text}
+              authorName={quote.writer}
+              bookTitle={quote.bookTitle || 'PsyVault Quote'}
+              preview
+            />
           ))}
         </section>
       ) : null}

@@ -12,11 +12,13 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore'
+import { createUserError } from '../lib/errors'
 import { db } from '../lib/firebase'
 import { DEFAULT_CATEGORIES } from '../lib/constants'
 
 const categoriesCollection = collection(db, 'categories')
 const CATEGORIES_PAGE_SIZE = 10
+const CATEGORIES_LIST_LIMIT = 50
 
 function normalizeCategoryName(name) {
   return name.trim().replace(/\s+/g, ' ')
@@ -45,7 +47,11 @@ async function findCategoryByNormalizedName(normalizedName) {
 }
 
 export async function getCategories() {
-  const categoriesQuery = query(categoriesCollection, orderBy('name', 'asc'))
+  const categoriesQuery = query(
+    categoriesCollection,
+    orderBy('name', 'asc'),
+    limit(CATEGORIES_LIST_LIMIT),
+  )
   const snapshot = await getDocs(categoriesQuery)
 
   if (snapshot.empty) {
@@ -104,10 +110,15 @@ export async function ensureCategoriesSeeded() {
 
 export async function createCategory(name) {
   const normalizedName = normalizeCategoryName(name)
+
+  if (!normalizedName) {
+    throw createUserError('Category name is required.')
+  }
+
   const duplicate = await findCategoryByNormalizedName(normalizedName)
 
   if (duplicate) {
-    throw new Error('Category already exists.')
+    throw createUserError('Category already exists.')
   }
 
   const createdDoc = await addDoc(categoriesCollection, {
@@ -122,10 +133,15 @@ export async function createCategory(name) {
 
 export async function updateCategory(id, name) {
   const normalizedName = normalizeCategoryName(name)
+
+  if (!normalizedName) {
+    throw createUserError('Category name is required.')
+  }
+
   const duplicate = await findCategoryByNormalizedName(normalizedName)
 
   if (duplicate && duplicate.id !== id) {
-    throw new Error('Category already exists.')
+    throw createUserError('Category already exists.')
   }
 
   await updateDoc(doc(db, 'categories', id), {

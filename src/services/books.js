@@ -1,7 +1,6 @@
 import {
   addDoc,
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -11,7 +10,9 @@ import {
   startAfter,
   updateDoc,
 } from 'firebase/firestore'
+import { createUserError } from '../lib/errors'
 import { db } from '../lib/firebase'
+import { getAuthToken } from './auth'
 import { buildCloudinaryAsset, extractPublicIdFromUrl } from './cloudinary'
 
 const booksCollection = collection(db, 'books')
@@ -35,17 +36,22 @@ function mapBook(docSnapshot) {
 }
 
 function buildBookPayload(input) {
-  const title = input.title.trim()
+  const title = input.title?.trim()
   const author = input.author?.trim() || ''
+  const category = input.category?.trim()
   const publicId = input.public_id || input.filePublicId || extractPublicIdFromUrl(input.fileUrl)
+
+  if (!title || !category || !input.fileUrl || !input.imageUrl?.trim() || !publicId) {
+    throw createUserError('Upload failed. Please try again.')
+  }
 
   return {
     title,
     author,
     title_lowercase: title.toLowerCase(),
     author_lowercase: author.toLowerCase(),
-    category: input.category,
-    subcategory: input.category,
+    category,
+    subcategory: category,
     imageUrl: input.imageUrl?.trim() || '',
     fileUrl: input.fileUrl,
     public_id: publicId,
@@ -78,12 +84,6 @@ export async function getBooksPage({ cursor = null } = {}) {
   }
 }
 
-export async function getBooks() {
-  const booksQuery = query(booksCollection, limit(10))
-  const snapshot = await getDocs(booksQuery)
-  return snapshot.docs.map(mapBook)
-}
-
 export async function getBookById(id) {
   const snapshot = await getDoc(doc(db, 'books', id))
 
@@ -114,15 +114,13 @@ export async function updateBook(id, input) {
   await updateDoc(doc(db, 'books', id), payload)
 }
 
-export async function deleteBook(id) {
-  await deleteDoc(doc(db, 'books', id))
-}
-
 export async function deleteBookViaFunction({ bookId, publicId }) {
+  const token = await getAuthToken()
   const response = await fetch('/.netlify/functions/delete-book', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
       bookId,
@@ -133,7 +131,11 @@ export async function deleteBookViaFunction({ bookId, publicId }) {
   const data = await response.json().catch(() => ({}))
 
   if (!response.ok) {
-    throw new Error(data.error || 'Unable to delete this book.')
+    if (response.status === 401 || response.status === 403) {
+      throw createUserError('Please sign in again.')
+    }
+
+    throw createUserError('Failed to delete book')
   }
 
   return data
