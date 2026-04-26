@@ -244,6 +244,7 @@ img {
 }
 
 .home-header-title-row {
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -254,6 +255,21 @@ img {
 .home-header-title {
   text-align: center;
   font-size: 0.96rem;
+}
+
+.home-header-github {
+  position: absolute;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  color: var(--text-muted);
+}
+
+.home-header-github:hover {
+  color: var(--text);
 }
 
 .home-header-controls-row {

@@ -1,3 +1,4 @@
+import { Code2 } from 'lucide-react'
 import { startTransition } from 'react'
 import { ALL_CATEGORIES } from '../lib/constants'
 
@@ -13,6 +14,15 @@ function HomeHeader({
       <div className="home-header-inner">
         <div className="home-header-title-row">
           <h1 className="library-title home-header-title">PsyVault</h1>
+          <a
+            className="home-header-github"
+            href="https://github.com/Samyy-Momin/psyvault"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open PsyVault on GitHub"
+          >
+            <Code2 size={18} strokeWidth={1.8} />
+          </a>
         </div>
 
         <div className="home-header-controls-row">
